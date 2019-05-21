@@ -7,3 +7,7 @@
 
 ## Input
 * msr file name
+* the names of the channels (as they will appear in the output)
+* Denoising before thresholding
+* Auto-threshold
+* Minimum size of regions allowed after thresholding
