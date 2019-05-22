@@ -14,6 +14,7 @@ from ij.measure import ResultsTable
 from ij.plugin.filter import ParticleAnalyzer as PA
 
 from ij import IJ
+from ij import WindowManager
 from ij.plugin import ImageCalculator
 from ij.gui import WaitForUserDialog
 from ij.process import ImageConverter
@@ -42,31 +43,36 @@ def open_msr(input_file):
     
     return imp1, imp2, imp3
 
-def auto_threshold(imp, is_auto_thresh, method="IsoData"):
+def auto_threshold(imp, ch_name, is_auto_thresh, method="IsoData"):
     if is_auto_thresh:
         IJ.setAutoThreshold(imp, "{} dark".format(method))
+        thres_min = imp.getProcessor().getMinThreshold()
         
     else:
         imp.show()
         IJ.run("Threshold...")
         # this is the method to wait the user set up the threshold
-        WaitForUserDialog("Set manual threshold", "Use slider to adjust threshold and press OK").show()             
+        wu = WaitForUserDialog("Set manual threshold for {}".format(ch_name), "Use slider to adjust threshold and press OK")
+        wu.show()             
         
         thres_min = imp.getProcessor().getMinThreshold()
         thres_max = imp.getProcessor().getMaxThreshold()
-        IJ.log("min threshold : "+str(thres_min))
-        IJ.log("max threshold : "+str(thres_max))
 
         IJ.setThreshold(imp, thres_min, thres_max)
         imp.hide()
+        WindowManager.getWindow("Threshold").close()
+
+    return thres_min
+        
     #IJ.run(imp, "Convert to Mask", "")
 
 def smooth(imp, sigma=1):
     IJ.run(imp, "Gaussian Blur...","sigma={}".format(sigma))
 
-def apply_mask(imp, sigma, is_auto_thresh):
+def apply_mask(imp, sigma, ch_name, is_auto_thresh):
     smooth(imp, sigma)
-    auto_threshold(imp, is_auto_thresh)
+    thres_min = auto_threshold(imp, ch_name, is_auto_thresh)
+    return thres_min
 
 def analyze(imp, min_area):
     MAXSIZE = 1000000000000
@@ -89,11 +95,10 @@ def analyze(imp, min_area):
     total  = sum([a*s for a,s in zip(area, signal)])
 
     area   = sum(area)
-    signal = total / count
     
-    #temp_results.getResultsWindow().close()
+    temp_results.getResultsWindow().close()
 
-    return count, area, signal
+    return count, area, total
 
 def main():
     DEBUG = False
@@ -116,15 +121,16 @@ def main():
 #    imp2.show()
 #    imp3.show()
 
-    apply_mask(imp1, sigma, is_auto_thresh)
-    apply_mask(imp2, sigma, is_auto_thresh)
-    apply_mask(imp3, sigma, is_auto_thresh)
+    t1 = apply_mask(imp1, sigma, CN[0], is_auto_thresh)
+    t2 = apply_mask(imp2, sigma, CN[0], is_auto_thresh)
+    t3 = apply_mask(imp3, sigma, CN[0], is_auto_thresh)
 
     results = ResultsTable()
     results.setHeading(0, "Channel")
     results.setHeading(1, "Count")
     results.setHeading(2, "Surface area")
     results.setHeading(3, "Surface signal")    
+    results.setHeading(4, "Threshold used")    
 
     def add_to_table(channel, c, a, s):
         results.incrementCounter()
@@ -136,12 +142,15 @@ def main():
          
     c, a,s = analyze(imp1, min_area)
     add_to_table(CN[0], c, a, s) 
+    results.addValue(4, t1)
 
     c,a,s = analyze(imp2, min_area)
     add_to_table(CN[1], c, a,s)
+    results.addValue(4, t2)
     
     c,a,s = analyze(imp3, min_area)
     add_to_table(CN[2], c, a,s)
+    results.addValue(4, t3)
 
     IJ.run(imp1, "Convert to Mask", "")
     IJ.run(imp2, "Convert to Mask", "")
@@ -165,10 +174,12 @@ def main():
     c,a,s = analyze(imp123, 0)
     add_to_table("{}+{}+{}".format(CN[0],CN[1], CN[2]), c, a, -1)
 
-    results.show("Surfaces")
+    title = "Coloco3surf {}".format(msr_fn_base)
+    results.show(title)
     
     imp_merge = RGBStackMerge.mergeChannels([imp1, imp2, imp3, imp12, imp13, imp23, imp123], False)
 
+    imp_merge.setTitle(title)
     imp_merge.show()
 
     print("Done")
