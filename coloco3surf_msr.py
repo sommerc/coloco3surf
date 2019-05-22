@@ -88,22 +88,26 @@ def analyze(imp, min_area):
 
     p.analyze(imp)
 
-    area   = list(temp_results.getColumn(0))
-    signal = list(temp_results.getColumn(1))
+    if temp_results.getCounter() == 0:
+        area   = []
+        signal = []
+    else:
+        area   = list(temp_results.getColumn(0))
+        signal = list(temp_results.getColumn(1))
+    
     count  = len(area)
-
     total  = sum([a*s for a,s in zip(area, signal)])
 
     area   = sum(area)
-    
-    temp_results.getResultsWindow().close()
+
+    if temp_results.getCounter() > 0:
+        temp_results.getResultsWindow().close()
 
     return count, area, total
 
 def main():
     DEBUG = False
     
-    #imp1, imp2, imp3 = open_msr(str(msr_fn))
     CN = [c.strip() for c in channel_names.split(",")]
 
     if DEBUG:
