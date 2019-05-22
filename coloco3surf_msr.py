@@ -63,30 +63,27 @@ def auto_threshold(imp, is_auto_thresh, method="IsoData"):
 
 def smooth(imp, sigma=1):
     IJ.run(imp, "Gaussian Blur...","sigma={}".format(sigma))
- 
 
 def apply_mask(imp, sigma, is_auto_thresh):
     smooth(imp, sigma)
     auto_threshold(imp, is_auto_thresh)
 
-
 def analyze(imp, min_area):
-
-    MAXSIZE = 1000000
+    MAXSIZE = 1000000000000
     MINCIRCULARITY = 0.0
     MAXCIRCULARITY = 1.
     
     options = PA.SHOW_RESULTS + PA.SHOW_ROI_MASKS
     
-    results = ResultsTable()
+    temp_results = ResultsTable()
     
-    p = PA(options, PA.AREA + PA.MEAN, results, min_area, MAXSIZE, MINCIRCULARITY, MAXCIRCULARITY)
+    p = PA(options, PA.AREA + PA.MEAN, temp_results, min_area, MAXSIZE, MINCIRCULARITY, MAXCIRCULARITY)
     p.setHideOutputImage(True)
 
     p.analyze(imp)
 
-    area   = list(results.getColumn(0))
-    signal = list(results.getColumn(1))
+    area   = list(temp_results.getColumn(0))
+    signal = list(temp_results.getColumn(1))
     count  = len(area)
 
     total  = sum([a*s for a,s in zip(area, signal)])
@@ -94,21 +91,21 @@ def analyze(imp, min_area):
     area   = sum(area)
     signal = total / count
     
-    results.getResultsWindow().close()
+    #temp_results.getResultsWindow().close()
 
     return count, area, signal
 
-
-    
-
-if __name__ in ["__builtin__", "__main__"]:
+def main():
+    DEBUG = False
     
     #imp1, imp2, imp3 = open_msr(str(msr_fn))
     CN = [c.strip() for c in channel_names.split(",")]
+
+    if DEBUG:
+        imp1, imp2, imp3 = open_test()
+    else:
+        imp1, imp2, imp3 = open_msr(str(msr_fn))
     
-
-    imp1, imp2, imp3 = open_test()
-
     msr_fn_base = os.path.basename(str(msr_fn))
 
     ImageConverter(imp1).convertToGray8()
@@ -127,8 +124,7 @@ if __name__ in ["__builtin__", "__main__"]:
     results.setHeading(0, "Channel")
     results.setHeading(1, "Count")
     results.setHeading(2, "Surface area")
-    results.setHeading(3, "Surface signal")
-    
+    results.setHeading(3, "Surface signal")    
 
     def add_to_table(channel, c, a, s):
         results.incrementCounter()
@@ -147,14 +143,14 @@ if __name__ in ["__builtin__", "__main__"]:
     c,a,s = analyze(imp3, min_area)
     add_to_table(CN[2], c, a,s)
 
-    IJ.run(imp1, "Convert to Mask", "");
-    IJ.run(imp2, "Convert to Mask", "");
-    IJ.run(imp3, "Convert to Mask", "");
+    IJ.run(imp1, "Convert to Mask", "")
+    IJ.run(imp2, "Convert to Mask", "")
+    IJ.run(imp3, "Convert to Mask", "")
     
     ic = ImageCalculator()
     imp12  = ic.run("Muliply create", imp1,  imp2)
     imp13  = ic.run("Muliply create", imp1,  imp3)
-    imp23  = ic.run("Muliply create", imp2,  imp2)
+    imp23  = ic.run("Muliply create", imp2,  imp3)
     imp123 = ic.run("Muliply create", imp12, imp3)
 
     c,a,s = analyze(imp12, 0)
@@ -175,7 +171,8 @@ if __name__ in ["__builtin__", "__main__"]:
 
     imp_merge.show()
 
-    
-        
-
     print("Done")
+
+    
+if __name__ in ["__builtin__", "__main__"]:
+    main()
