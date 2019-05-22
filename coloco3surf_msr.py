@@ -2,8 +2,10 @@
 #@ String (label="Channel names", value="Ch1, Ch2, Ch3") channel_names
 #@ Float(label="Denosing (blurring sigma)", value=2.) sigma
 #@ Boolean(label="Auto-threshold", value=True) is_auto_thresh
-#@ String (visibility=MESSAGE, value="Without auto-threshold, you'll be asked to set manually") msg1
-#@ Integer(label="Minimum area of region", value=10) min_area
+#@ String (visibility=MESSAGE, value="Without auto-threshold, you'll be asked to set it manually") msg1
+#@ Integer(label="Minimum area of region (px)", value=16) min_area
+#@ Boolean(label="Save raw channels as tif", value=False) save_raw
+#@ Boolean(label="Save surfaces as tif    ", value=Fasle) save_surf
 
 import os
 import sys
@@ -20,7 +22,7 @@ from ij.gui import WaitForUserDialog
 from ij.process import ImageConverter
 from loci.plugins.in import ImporterOptions
 from ij.plugin import RGBStackMerge
-
+from ij.process import StackStatistics
 
 def open_test():
     imp1 = IJ.openImage("H:/projects/041_yoah_coloc/test_img/ch1.tif")
@@ -37,17 +39,38 @@ def open_msr(input_file):
         options.setSeriesOn(s, True)
     imps = BF.openImagePlus(options)
 
-    imp1 = imps[0]
-    imp2 = imps[1]
+    imp1 = imps[1]
+    imp2 = imps[0]
     imp3 = imps[2] 
     
     return imp1, imp2, imp3
+
+def signed2unsigned16(imp):
+    stack = imp.getStack()
+    if stack.isVirtual():
+        IJ.error("Non-virtual stack required");
+    cal = imp.getCalibration()
+    if not cal.isSigned16Bit():
+        IJ.error("Signed 16-bit image required");
+    cal.disableDensityCalibration()
+    ip = imp.getProcessor()
+    min = ip.getMin()
+    max = ip.getMax()
+    stats = StackStatistics(imp)
+    minv = stats.min
+    for i in range(stack.getSize()):
+        ip = stack.getProcessor(i+1)
+        ip.add(-minv)
+    
+    imp.setStack(stack)
+    ip = imp.getProcessor()
+    ip.setMinAndMax(min-minv, max-minv)
+    imp.updateAndDraw()
 
 def auto_threshold(imp, ch_name, is_auto_thresh, method="IsoData"):
     if is_auto_thresh:
         IJ.setAutoThreshold(imp, "{} dark".format(method))
         thres_min = imp.getProcessor().getMinThreshold()
-        
     else:
         imp.show()
         IJ.run("Threshold...")
@@ -58,13 +81,14 @@ def auto_threshold(imp, ch_name, is_auto_thresh, method="IsoData"):
         thres_min = imp.getProcessor().getMinThreshold()
         thres_max = imp.getProcessor().getMaxThreshold()
 
+        print("Min threshold", thres_min)
+
         IJ.setThreshold(imp, thres_min, thres_max)
         imp.hide()
         WindowManager.getWindow("Threshold").close()
 
     return thres_min
         
-    #IJ.run(imp, "Convert to Mask", "")
 
 def smooth(imp, sigma=1):
     IJ.run(imp, "Gaussian Blur...","sigma={}".format(sigma))
@@ -79,7 +103,7 @@ def analyze(imp, min_area):
     MINCIRCULARITY = 0.0
     MAXCIRCULARITY = 1.
     
-    options = PA.SHOW_RESULTS + PA.SHOW_ROI_MASKS
+    options = PA.SHOW_MASKS 
     
     temp_results = ResultsTable()
     
@@ -89,21 +113,21 @@ def analyze(imp, min_area):
     p.analyze(imp)
 
     if temp_results.getCounter() == 0:
-        area   = []
-        signal = []
+        areas   = []
+        signals = []
     else:
-        area   = list(temp_results.getColumn(0))
-        signal = list(temp_results.getColumn(1))
+        areas   = list(temp_results.getColumn(0))
+        signals = list(temp_results.getColumn(1))
     
-    count  = len(area)
-    total  = sum([a*s for a,s in zip(area, signal)])
+    count  = len(areas)
+    area   = sum(areas)
 
-    area   = sum(area)
+    total = 0
+    if area > 0:
+        total  = sum([a*s for a,s in zip(areas, signals)]) / area
+      
 
-    if temp_results.getCounter() > 0:
-        temp_results.getResultsWindow().close()
-
-    return count, area, total
+    return p.getOutputImage(), count, area, total
 
 def main():
     DEBUG = False
@@ -117,44 +141,70 @@ def main():
     
     msr_fn_base = os.path.basename(str(msr_fn))
 
-    ImageConverter(imp1).convertToGray8()
-    ImageConverter(imp2).convertToGray8()
-    ImageConverter(imp3).convertToGray8()
-    
-#    imp1.show()
-#    imp2.show()
-#    imp3.show()
+    signed2unsigned16(imp1)
+    signed2unsigned16(imp2)
+    signed2unsigned16(imp3)
+
+    imp1.updateAndDraw()
+    imp2.updateAndDraw()
+    imp3.updateAndDraw()
+
+    IJ.run(imp1, "Enhance Contrast", "saturated=0.35")
+    IJ.run(imp2, "Enhance Contrast", "saturated=0.35")
+    IJ.run(imp3, "Enhance Contrast", "saturated=0.35")
+
+    cal = imp1.getCalibration()
+    IMAGE_AREA_UM = cal.pixelWidth * imp1.getWidth() * cal.pixelHeight * imp1.getHeight()
 
     t1 = apply_mask(imp1, sigma, CN[0], is_auto_thresh)
-    t2 = apply_mask(imp2, sigma, CN[0], is_auto_thresh)
-    t3 = apply_mask(imp3, sigma, CN[0], is_auto_thresh)
+    t2 = apply_mask(imp2, sigma, CN[1], is_auto_thresh)
+    t3 = apply_mask(imp3, sigma, CN[2], is_auto_thresh)
 
     results = ResultsTable()
     results.setHeading(0, "Channel")
     results.setHeading(1, "Count")
-    results.setHeading(2, "Surface area")
-    results.setHeading(3, "Surface signal")    
-    results.setHeading(4, "Threshold used")    
+    results.setHeading(2, "Surface area (um)")
+    results.setHeading(3, "Surface area (%)")
+    results.setHeading(4, "Surface signal")    
+    #results.setHeading(5, "Threshold used")    
 
     def add_to_table(channel, c, a, s):
         results.incrementCounter()
         results.setValue(0, results.getCounter()-1, channel)
         results.addValue(1, c)
         results.addValue(2, a)
-        results.addValue(3, s)
-        results.setLabel(msr_fn_base, results.getCounter()-1)
-         
-    c, a,s = analyze(imp1, min_area)
-    add_to_table(CN[0], c, a, s) 
-    results.addValue(4, t1)
+        results.addValue(3, a /IMAGE_AREA_UM)
+        results.addValue(4, s)
+        #results.setLabel(msr_fn_base, results.getCounter()-1)
 
-    c,a,s = analyze(imp2, min_area)
+    imp1_mask, c,a,s = analyze(imp1, min_area)
+    add_to_table(CN[0], c, a, s) 
+    #results.addValue(4, t1)
+
+    imp2_mask, c,a,s = analyze(imp2, min_area)
     add_to_table(CN[1], c, a,s)
-    results.addValue(4, t2)
+    #results.addValue(4, t2)
     
-    c,a,s = analyze(imp3, min_area)
+    imp3_mask, c,a,s = analyze(imp3, min_area)
     add_to_table(CN[2], c, a,s)
-    results.addValue(4, t3)
+    #results.addValue(4, t3)
+
+#    IJ.run(imp1, "Enhance Contrast", "saturated=0.35")
+#    IJ.run(imp2, "Enhance Contrast", "saturated=0.35")
+#    IJ.run(imp3, "Enhance Contrast", "saturated=0.35")
+
+    imp_raw = RGBStackMerge.mergeChannels([imp1, imp2, imp3], True)
+
+    luts = list(imp_raw.getLuts())
+    imp_raw.setLuts([luts[2], luts[0], luts[1]] )
+    
+    imp_raw.setTitle(msr_fn_base )
+    imp_raw.show()
+
+    if save_raw:
+        save_base_fn = os.path.splitext(str(msr_fn))[0]
+        IJ.save(imp_raw, save_base_fn + ".tif")
+    
 
     IJ.run(imp1, "Convert to Mask", "")
     IJ.run(imp2, "Convert to Mask", "")
@@ -166,25 +216,33 @@ def main():
     imp23  = ic.run("Muliply create", imp2,  imp3)
     imp123 = ic.run("Muliply create", imp12, imp3)
 
-    c,a,s = analyze(imp12, 0)
+    imp12_mask, c,a,s = analyze(imp12, min_area)
     add_to_table("{}+{}".format(CN[0],CN[1]), c, a, -1)
 
-    c,a,s = analyze(imp13, 0)
+    imp13_mask, c,a,s = analyze(imp13, min_area)
     add_to_table("{}+{}".format(CN[0],CN[2]), c, a, -1)
 
-    c,a,s = analyze(imp23, 0)
+    imp23_mask,c,a,s = analyze(imp23, min_area)
     add_to_table("{}+{}".format(CN[1],CN[2]), c, a, -1)
 
-    c,a,s = analyze(imp123, 0)
+    imp123_mask,c,a,s = analyze(imp123, min_area)
     add_to_table("{}+{}+{}".format(CN[0],CN[1], CN[2]), c, a, -1)
 
     title = "Coloco3surf {}".format(msr_fn_base)
     results.show(title)
     
-    imp_merge = RGBStackMerge.mergeChannels([imp1, imp2, imp3, imp12, imp13, imp23, imp123], False)
+    imp_merge = RGBStackMerge.mergeChannels([imp1_mask, imp2_mask, imp3_mask, imp12_mask, imp13_mask, imp23_mask, imp123_mask], False)
+
+    luts = list(imp_merge.getLuts())
+    imp_merge.setLuts([luts[2], luts[0], luts[1]] + luts[3:])
+    
 
     imp_merge.setTitle(title)
     imp_merge.show()
+
+    if save_surf:
+        save_base_fn = os.path.splitext(str(msr_fn))[0]
+        IJ.save(imp_merge, save_base_fn + "_surfaces.tif")
 
     print("Done")
 
