@@ -1,6 +1,6 @@
 #@ File(label="Select a input .msr file", style="file") msr_fn
 #@ String (label="Channel names", value="Ch1, Ch2, Ch3") channel_names
-#@ Float(label="Denosing (blurring sigma)", value=2.) sigma
+#@ Float(label="Denosing (blurring sigma)", value=1.5) sigma
 #@ Boolean(label="Auto-threshold", value=True) is_auto_thresh
 #@ String (visibility=MESSAGE, value="Without auto-threshold, you'll be asked to set it manually") msg1
 #@ Integer(label="Minimum area of region (px)", value=64) min_area
