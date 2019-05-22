@@ -3,7 +3,7 @@
 #@ Float(label="Denosing (blurring sigma)", value=2.) sigma
 #@ Boolean(label="Auto-threshold", value=True) is_auto_thresh
 #@ String (visibility=MESSAGE, value="Without auto-threshold, you'll be asked to set it manually") msg1
-#@ Integer(label="Minimum area of region (px)", value=16) min_area
+#@ Integer(label="Minimum area of region (px)", value=64) min_area
 #@ Boolean(label="Save raw channels as tif", value=False) save_raw
 #@ Boolean(label="Save surfaces as tif    ", value=Fasle) save_surf
 
@@ -173,7 +173,7 @@ def main():
         results.setValue(0, results.getCounter()-1, channel)
         results.addValue(1, c)
         results.addValue(2, a)
-        results.addValue(3, a /IMAGE_AREA_UM)
+        results.addValue(3, 100 * a /IMAGE_AREA_UM)
         results.addValue(4, s)
         #results.setLabel(msr_fn_base, results.getCounter()-1)
 
