@@ -42,8 +42,7 @@ def open_msr(input_file):
     
     return imp1, imp2, imp3
 
-
-def auto_threshold(imp, is_auto_thresh, method="Otsu"):
+def auto_threshold(imp, is_auto_thresh, method="IsoData"):
     if is_auto_thresh:
         IJ.setAutoThreshold(imp, "{} dark".format(method))
         
