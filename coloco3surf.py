@@ -49,10 +49,12 @@ def open_msr(input_file):
 def signed2unsigned16(imp):
     stack = imp.getStack()
     if stack.isVirtual():
-        IJ.error("Non-virtual stack required");
+        pass
+        #IJ.error("Non-virtual stack required");
     cal = imp.getCalibration()
     if not cal.isSigned16Bit():
-        IJ.error("Signed 16-bit image required");
+        pass
+        #IJ.error("Signed 16-bit image required");
     cal.disableDensityCalibration()
     ip = imp.getProcessor()
     min = ip.getMin()
@@ -74,6 +76,7 @@ def auto_threshold(imp, ch_name, is_auto_thresh, method="IsoData"):
         thres_min = imp.getProcessor().getMinThreshold()
     else:
         imp.show()
+        IJ.selectWindow(imp.getTitle())
         IJ.run("Threshold...")
         # this is the method to wait the user set up the threshold
         wu = WaitForUserDialog("Set manual threshold for {}".format(ch_name), "Use slider to adjust threshold and press OK")
@@ -133,7 +136,7 @@ def analyze(imp, min_area):
 def main():
     DEBUG = False
     
-    CN = ["CH_{}".format(i) for i in range(1,4)]
+    CN = ["Channel {}".format(i) for i in range(1,4)]
 
     msr_fn = "Coloco3surf"
     msr_fn_base = "Coloco3surf"
