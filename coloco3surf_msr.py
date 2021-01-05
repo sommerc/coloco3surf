@@ -35,18 +35,23 @@ def open_msr(input_file):
     options = ImporterOptions()
     options.setId(input_file)
     #options.clearSeries()
-    for s in [3,4,5]:
+    for s in [2,3,4,5]:
         options.setSeriesOn(s, True)
     imps = BF.openImagePlus(options)
 
-    if len(imps) == 3:
-        imp1 = imps[1]
-        imp2 = imps[0]
-        imp3 = imps[2] 
-    else:
+    print(len(imps))
+
+    if len(imps) == 4:
+        imp1 = imps[2]
+        imp2 = imps[1]
+        imp3 = imps[3] 
+    elif len(imps) == 2:
         imp1 = imps[1]
         imp2 = imps[0]
         imp3 = imps[0]
+    else:
+        raise RuntimeError("unknown channels")
+       
     
     return imp1, imp2, imp3
 
@@ -56,6 +61,7 @@ def signed2unsigned16(imp):
         IJ.error("Non-virtual stack required");
     cal = imp.getCalibration()
     if not cal.isSigned16Bit():
+        return
         IJ.error("Signed 16-bit image required");
     cal.disableDensityCalibration()
     ip = imp.getProcessor()
