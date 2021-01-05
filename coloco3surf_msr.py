@@ -39,9 +39,14 @@ def open_msr(input_file):
         options.setSeriesOn(s, True)
     imps = BF.openImagePlus(options)
 
-    imp1 = imps[1]
-    imp2 = imps[0]
-    imp3 = imps[2] 
+    if len(imps) == 3:
+        imp1 = imps[1]
+        imp2 = imps[0]
+        imp3 = imps[2] 
+    else:
+        imp1 = imps[1]
+        imp2 = imps[0]
+        imp3 = imps[0]
     
     return imp1, imp2, imp3
 
