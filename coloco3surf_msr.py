@@ -60,7 +60,7 @@ def open_msr(input_file):
         new_width = max(widths)
         new_height = max(heights)
 
-        IJ.log(" -- Resolution of images does not match. Resampling to highest resolution {} x {}".format(new_width, new_height))
+        IJ.log(" -- Resolution of images does not match. Resampling to highest resolution: {} x {}".format(new_width, new_height))
         
 
         imp1 = imp1.resize(new_width, new_height, "bilinear")
