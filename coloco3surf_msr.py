@@ -32,6 +32,7 @@ def open_test():
     return imp1, imp2, imp3
 
 def open_msr(input_file):
+    IJ.log("Reading images from {}".format(input_file))
     options = ImporterOptions()
     options.setId(input_file)
     #options.clearSeries()
@@ -39,18 +40,33 @@ def open_msr(input_file):
         options.setSeriesOn(s, True)
     imps = BF.openImagePlus(options)
 
-    print(len(imps))
-
     if len(imps) == 4:
         imp1 = imps[2]
         imp2 = imps[1]
         imp3 = imps[3] 
     elif len(imps) == 2:
+        IJ.log(" -- Only two channels found. Replicating first as third.")
         imp1 = imps[1]
         imp2 = imps[0]
         imp3 = imps[0]
     else:
         raise RuntimeError("unknown channels")
+
+
+    widths  = set([imp1.width, imp2.width, imp3.width])
+    heights = set([imp1.height, imp2.height, imp3.height])
+
+    if len(widths) > 1 or len(heights) > 1:
+        IJ.log(" -- Resolution of images does not match. Resampling to highest resolution")
+        new_width = max(widths)
+        new_height = max(heights)
+
+        imp1 = imp1.resize(new_width, new_height, "bilinear")
+        imp2 = imp2.resize(new_width, new_height, "bilinear")
+        imp3 = imp3.resize(new_width, new_height, "bilinear")
+        
+
+    
        
     
     return imp1, imp2, imp3
@@ -92,7 +108,7 @@ def auto_threshold(imp, ch_name, is_auto_thresh, method="IsoData"):
         thres_min = imp.getProcessor().getMinThreshold()
         thres_max = imp.getProcessor().getMaxThreshold()
 
-        print("Min threshold", thres_min)
+        IJ.log(" -- {}: Min threshold {}".format(ch_name, thres_min))
 
         IJ.setThreshold(imp, thres_min, thres_max)
         imp.hide()
@@ -255,7 +271,7 @@ def main():
         save_base_fn = os.path.splitext(str(msr_fn))[0]
         IJ.save(imp_merge, save_base_fn + "_surfaces.tif")
 
-    print("Done")
+    IJ.log("Done")
 
     
 if __name__ in ["__builtin__", "__main__"]:
