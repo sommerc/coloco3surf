@@ -62,10 +62,17 @@ def open_msr(input_file):
 
         IJ.log(" -- Resolution of images does not match. Resampling to highest resolution: {} x {}".format(new_width, new_height))
         
-
+        cal = imp1.getCalibration()
+        
         imp1 = imp1.resize(new_width, new_height, "bilinear")
         imp2 = imp2.resize(new_width, new_height, "bilinear")
         imp3 = imp3.resize(new_width, new_height, "bilinear")
+
+        imp1.setCalibration(cal)
+        imp2.setCalibration(cal)
+        imp3.setCalibration(cal)
+
+        
         
 
     
